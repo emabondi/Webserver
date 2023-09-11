@@ -1,0 +1,89 @@
+test:
+	nc localhost 8080
+
+Spiegazione breve di tutte le funzioni
+
+htons: prende come input un intero in formato corto (es, 0x1234) e lo trasforma da formato host a formato server (se host utilizza architettura little endian il risultato sarà 0x3421, se usa formato big endian sarà 0x1234)
+
+htonl: stessa cosa di htons ma prende in input numeri interi in formato lungo (es. 0x12345678)
+
+ntohs: l'opposto di htons
+
+ntohl: l'opposto di htonl
+
+select: monitora un insieme di file descriptor e restituisce il numero di file descriptor pronti per la lettura, o per la scrittura o per i quali si è verificato un errore,
+		prende 5 argomenti in input, Quanti filedesc deve monitorare; un puntatore ad un insieme di filedesc sola lettura; un puntatore ad un insieme di filedesc sola scrittura; puntatore a filedesc da monitorare per eventuali errori; tempo in ms di timeout;
+		se ci sono filedesc che hanno generato errori restituirà un valore negativo
+
+poll:	fa la stessa cosa di select ma prende in input solo due argomenti
+		un array di strutture pollfd, ogni elemento dell'array contiene un filedesc da monitorare; la dimensione dell'array
+		la struttura pollfd contiene 3 campi; un FD da monitorare; una maschera di bit EVENTS che indica gli eventi che triggerano la funzione (lettura, scrittura o errore); REVENTS è una maschera di bits che indica gli eventi che si sono verificati;
+
+kqueue:	crea un oggetto kqueue che può essere utilizzato per monitorare eventi di sistema come la disponibilità di dati per la lettura, la scrittura o la chiusura di un file. non prende input e restituisce un FD che rappresenta la coda degli eventi.
+
+kevent: int kevent(int kq, const struct kevent *changelist, int nchanges, struct kevent *eventlist, int nevents, const struct timespec *timeout);
+		kq = FD restituito da kqueue;
+		changelist = array di struct kevent che specificano gli eventi da modificare o aggiungere
+		nchanges = grandezza array di struct changelist
+		eventlist = array di struct kevent in cui verranno messi gli eventi pronti per la gestione
+		nevent = grandezza array di struct eventlist1
+		timeout = eventuale timeout in ms dopo il quale la funzione non attende più la disponibilità degli eventi
+		restituisce il numero di eventi pronti alla gestione o -1 in caso di errore + perror
+
+socket: crea un endpoint per le comunicazioni e ritorna un file descriptor riferito ad esso. Prende tre argomenti->
+		int Domain: seleziona la famiglia di protocolli che verrá usata per le comunicazioni;
+		int Type: specifica il tipo di comunicazione vedi man.
+		int Protocol: di solito esiste un protocollo specifico per ogni famiglia quindi si puó usare 0; Puó succedere che siano piú di uno quindi va specificato (il protocol nummber é relativo al domain)
+		Restituisce fd in caso di successo, -1 in caso di errore
+
+accept: accettare una connessione in ingresso su un socket creato tramite la funzione socket(), prende 3 valori in input
+		il FD del socket(restituito dalla funz socket());
+		un putatore ad una struct sockaddr in cui verrá messo l'indirizzo del client che si collega al socket, si può mettere Null se l'indirizzo non è importante
+		un puntatore ad una var di tipo socklen_t dove verrà messa la lunghezza dell'indirizzo
+		Restituisce l'fd del socket che si è collegato o -1 in caso di errore
+
+listen: Marca il socket passato come socket passivo (socket che verra usato per accetare richieste di connessione in arrivo usando accept() ). Prende due argomenti ->
+		int Socket_fd: fd del socket;
+		int Backlog: definisce la lunghezza massima della coda che si puó formare (se la coda é piena il client puó ricevere un errore o se il protocollo supporta la retrasmissione la richiesta viene ignorata per riprovare piú tardi);
+		Restituisce 0 in caso di successo, -1 in caso di errore
+
+send:	invia i dati ad un socket, prende in input 4 paramentri
+		l'fd del socket al quale inviare dati
+		un puntatore al buffer che contiene i dati
+		un size_t che rappresenta la lunghezza di buffer
+		una flag che rappresenta la modalità di invio (usare 0 per un invio normale)
+		restituisce il numero di byte inviati o -1 in caso di errore
+
+recv:	Serve per ricevere messaggi da un socket (é come un read ma con le flag), normalmente é usata solo su socket connessi. Prende 4 argomenti->
+		int sockfd: fd del socket;
+		void *buf:  dove viene inserito il messaggio;
+		size_t len: lunghezza del buffer;
+		int flag: vedi man;
+		Restituisce il numero di byte ricevuti, -1 in caso di errore, 0 se ha ricevuto 0 byte o in altri due casi ;
+
+bind:	serve per assegnare un indirizzo ad un socket, prende in input 3 paramentri
+		l'FD del socket da indirizzare
+		un puntatore ad una struct sockaddr dove verrà messo l'indirizzo assegnato al socket (IPv4 i IPv6) a seconda del tipo che si vuole assegnare
+		un puntatore ad una var socklen_t che indica la lunghezza dell'indirizzare
+		Restituisce 0 in caso di successo, -1 in caso di errore
+
+connect: collega un socket con un indirizzo. Prende 3 argomenti ->
+		 int sockfd: fd del socket;
+		 const struct sockadddr *addr: contiene l'indirizzo del socket;
+		 socklen_t addrlen: size dell'indirizzo;
+		 Restituisce 0 in caso di successo, -1 in caso di errore
+
+inet_addr:	viene utilizzata per convertire un indirizzo IP nella sua rappresentazione binaria a 32 bit, prende un paramentro
+			una stringa contente l'IP
+			ritorna una var di tipo in_addr_t che rappresenta il binario a 32bit dell'ip;
+
+setsockopt: serve a dare opzioni aggiuntive ai socket. Prende 5 argomenti ->
+			int socket
+
+getsockname:	restituisce l'indirizzo di un socket già creato tramite la funz bind(), accetta 3 parametri:
+				l'FD del socket di cui si vuole ottenere l'indirizzo
+				un puntatore ad una struct sockaddr dove verrà messo l'indirizzo
+				un puntatore ad una var socklen_t dove verrà messa la lunghezza dell'indirizzo
+				ritorna 0 o -1 in caso di errore
+
+fcntl: 
