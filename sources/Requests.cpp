@@ -170,42 +170,16 @@ void	Server::handlePUT(int fd, Config &location) {
 }
 
 void Server::handlePUTChunked(int fd, Config &location) {
-	std::string line = _requestMap["Last"];
-	if (line == "") {
-		char buf[256];
-		short nbytes = recv(fd, buf, 255, 0);
-		buf[nbytes] = '\0';
-		line += buf;
-	}
-	std::stringstream content;
-	while (getChunk(line, fd) == true) {
-		if (content.str().size() + line.size() > location.getClientMaxBodySize() && location.getClientMaxBodySize() != 0)
-			return default_error_answer(413, fd, location);
-		if (line.rfind("\r\n")){
-			line.pop_back();
-			line.pop_back();
-		}
-		content << line;
-		line.clear();
-		char buf[256];
-		short nbytes = recv(fd, buf, 255, 0);
-		if (nbytes == 0) {
-			std::cout<<"recv mi da 0 esco"<<std::endl;
-			return ;
-		}
-		buf[nbytes] = '\0';
-		line += buf;
-		std::cout<<"size "<<line.size() <<" line da mandare a getChunk"<<std::endl;
-	}
-		//std::cout << "size "<<chunkSize<<std::endl<< "content:"<<content.str()<<std::endl<<" content size "<<content.str().size()<<std::endl;
+	std::string body = getChunks(fd);
+		//std::cout << "size "<<chunkSize<<std::endl<< "body:"<<body<<std::endl<<" body size "<<body.size()<<std::endl;
 	std::string filepath(location.getRoot());
-	line = _requestMap["URI"];
+	std::string line = _requestMap["URI"];
 	filepath += line.substr(line.find(location._location_name) + location._location_name.size());
 	if (checkTryFiles("$uri", location)) {
 		std::ofstream file(filepath.c_str(), std::ios::out | std::ios::trunc);
 		//std::cout<< "tentativo prima: " << filepath << std::endl;
 		if (file.is_open()) {
-			file << content.rdbuf();
+			file << body;
 			file.close();
 			return default_error_answer(201, fd, location);
 		}
@@ -221,7 +195,7 @@ void Server::handlePUTChunked(int fd, Config &location) {
 			//std::cout<< "tentativo: " << filepath + *it << " it:"<<*it<< std::endl;
 			file.open((filepath + *it).c_str());
 			if (file.is_open() == true){
-				file << content.rdbuf();
+				file << body;
 				file.close();
 				return default_error_answer(201, fd, location);
 			}
@@ -232,86 +206,52 @@ void Server::handlePUTChunked(int fd, Config &location) {
 	default_error_answer(404, fd, location);
 }
 
-bool Server::getChunk(std::string &line, int fd) {
-	std::cout<<"ENTRO line:"<<line<<std::endl;
-	std::size_t pos = line.find("\r\n");
-	std::stringstream c(line.substr(0, pos));
-	std::size_t chunkSize = 0;
-	c >> std::hex >> chunkSize;
-	if (chunkSize == 0) {
-		std::cout<<"esco per size 0 "<<std::endl;
-		return false;
-	}
-	std::cout<<"line before "<<line<<std::endl;
-	line.erase(0, pos + 2);
-	std::cout<<"line after  "<<line<<" chunk size "<<chunkSize<<std::endl;
-	while (line.size() < chunkSize) {
-		size_t bufsize = chunkSize - line.size() + 3;
-		std::cout<<"bufsize "<<bufsize<< " chunkSize "<< chunkSize << " content size "<< line.size()<<std::endl;
-		char buf[bufsize];
-		short nbytes = recv(fd, buf, bufsize - 1, 0);
-		buf[nbytes] = '\0';
-		std::cout<<"line size before "<<line.size()<<std::endl;
-		line += buf;
-		std::cout<<"line size after "<<line.size()<<std::endl;
-	}
-	return true;
-}
+std::string Server::getChunks(int fd){
+	char c;
+	size_t size;
+	std::string buf;
+	std::string body;
 
-//short Server::getRequestContent(int fd, std::string line, std::stringstream &content, int maxBodySize) {
-//	std::size_t pos = line.find("\r\n");
-//	std::stringstream c(line.substr(0, pos));
-//	std::size_t chunkSize = 0;
-//	c >> std::hex >> chunkSize;
-//	content << line.substr(pos + 2);
-//
-//	while (content.str().size() < chunkSize) {
-//		size_t bufsize = chunkSize - content.str().size() + 3;
-//		std::cout<<"bufsize "<<bufsize<< " chunkSize "<< chunkSize << " content size "<< content.str().size()<<std::endl;
-//		char buf[bufsize];
-//		short nbytes = recv(fd, buf, bufsize - 1, 0);
-//		buf[nbytes] = '\0';
-//		content << buf;
-//			while (chunkSize > content.str().size() ) {
-//				size_t bsize = chunkSize - content.str().size() + 3;
-//				std::cout<<"bsize "<<bsize<< " chunkSize "<< chunkSize << " content size "<< content.str().size()<<std::endl;
-//				char b[bsize];
-//				short n = recv(fd, b, bsize - 1, 0);
-//				b[n] = '\0';
-//				content << b;
-//			}
-//		std::cout<<"received size: "<<content.str().size()<<std::endl;
-//			/*std::string temp(content.str().substr(content.str().size() - 3));*/
-//		std::string temp(buf);
-//		/*if (temp.find("\r\n") == std::string::npos)
-//			break;
-//		std::cout<<"ha trovato \\r\\n "<<std::endl;
-//		temp.clear();*/
-//		while (temp.find("\r\n") == std::string::npos) {
-//			unsigned char c;
-//			if (recv(fd, &c, sizeof(unsigned char), 0) <= 0){
-//				std::cout<<"recv non ha niente"<<std::endl;
-//				return 204;
-//			}
-//			temp += c;
-//			std::cout<<"new hex chunk "<< temp<<std::endl;
-//		}
-//		temp.pop_back();
-//		temp.pop_back();
-//		std::cout<<"new hex chunk popped "<< temp<<std::endl;
-//		std::stringstream converter(temp);
-//		std::size_t newChunk;
-//		converter >> std::hex >> newChunk;
-//		std::cout<<"new chunk converted "<< newChunk<<std::endl;
-//		if (newChunk == 0)
-//			break ;
-//		chunkSize += newChunk;
-//		if (chunkSize > maxBodySize && maxBodySize != 0)
-//			return 413;
-//		default_error_answer(100, fd, _config);
-//	}
-//	return 0;
-//}
+	std::cout<<"wait..."<<std::endl;
+	int max_body_size = _config.getClientMaxBodySize();
+	while(body.size() < max_body_size || max_body_size == 0)
+	{
+		while (buf.find("\r\n") == std::string::npos)
+		{
+			if (recv(fd, &c, 1, 0) == 0) //condizione un po' a caso
+				return body;
+			buf += c;
+
+		}
+		std::stringstream conv(buf.substr(0, buf.find("\r\n")));
+		size = 0;
+		conv >> std::hex >> size;
+		if(size == 0)
+			goto pene;
+		buf.clear();
+		while (buf.size() < size + 2)
+		{
+			size_t s = size + 3 - buf.size();
+			char buff[s];
+			// std::cout<<"i:"<<i<<std::endl;
+			//if (recv(fd, &c, 1, 0) == 0) //condizione un po' a caso
+			//	return body;
+			size_t nbytes = recv(fd, buff, s - 1, 0);
+			buff[nbytes] = '\0';
+			buf += buff;
+			//std::cout<<"buf2 size:"<<buf.size()<<std::endl;
+		}
+		buf.erase(buf.size() - 2);
+		//std::cout<<"buf2 size:"<<buf.size()<<std::endl;
+		body += buf;
+		std::cout<<"size body:"<<body.size()<<std::endl;
+		buf.clear();
+	}
+	pene:
+		;
+	std::cout<<"vado dopo pene "<<body.size()<<std::endl;
+	return body;
+}
 
 int Server::getBody(std::ifstream &body, Config &location) {
 	std::string resource_path = _requestMap["URI"];

@@ -69,7 +69,7 @@ void	Server::handleServer(void) {
 }
 
 void	Server::handleClient(int i) {
-	char			buf[256];
+	unsigned char	buf;
 	int				nbytes;
 	std::string		request;
 	struct pollfd	*socketArr;
@@ -78,12 +78,8 @@ void	Server::handleClient(int i) {
 	socketArr = _pfds.getSocketArr();
 	while (1)
 	{
-							std::cout<<"giro"<<std::endl;
-		nbytes = recv(socketArr[i].fd, buf, 255, 0);
-							std::cout<<"giro2"<<std::endl;
-		if (nbytes == 0)
-			break ;
-		else if (nbytes < 0)
+		nbytes = recv(socketArr[i].fd, &buf, sizeof(unsigned char), 0);
+		if (nbytes < 0)
 		{
 			std::cout << "Recv error\n";
 			close(socketArr[i].fd);
@@ -91,16 +87,16 @@ void	Server::handleClient(int i) {
 			std::cout << "Connection from " << socketArr[i].fd << " closed.\n";
 			break ;
 		}
-		buf[nbytes] = '\0';
+		if (nbytes == 0)
+			break ;
 		request += buf;
 		if (request.find("\r\n\r\n") != std::string::npos)
 			break ;
 	}
+	std::cout<<request<<std::endl;
 	this->parseRequest(request);
 	if (_requestMap["URI"] != "/favicon.ico")
 		std::cout << request << std::endl;
-	// for (std::map<std::string, std::string>::iterator it = _requestMap.begin(); it != _requestMap.end(); it++)
-	// 	std::cout << "first:" << it->first << " second:" << it->second << std::endl;
 	Config location;
 	if (this->checkRequest(socketArr[i].fd, location)) {
 /*			std::cout<<"INIZIO "<<location._location_name<<std::endl;

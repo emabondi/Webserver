@@ -2,59 +2,37 @@
 
 void	Server::handlePOST(int fd, Config &location) {
 	if (_requestMap["Transfer-Encoding"] == "chunked") {
-		std::string line = _requestMap["Last"];
-		if (line == "") {
-			char buf[256];
-			std::cout<<"pre recv0"<<std::endl;
-			short nbytes = recv(fd, buf, 255, 0);
-			std::cout<<"post recv0"<<std::endl;
-			buf[nbytes] = '\0';
-			line += buf;
-		}
-		std::stringstream content;
-		while (getChunk(line, fd) == true) {
-			if (content.str().size() + line.size() > location.getClientMaxBodySize() && location.getClientMaxBodySize() != 0)
-				return default_error_answer(413, fd, location);
-			if (line.rfind("\r\n")){
-				std::cout<< "trovato carriage in line:"<<line<<std::endl;
-				line.pop_back();
-				line.pop_back();
-			}
-			content << line;
-			line.clear();
-			char buf[256];
-			std::cout<<"pre recv"<<std::endl;
-			short nbytes = recv(fd, buf, 255, 0);
-			std::cout<<"post recv"<<std::endl;
-			if (nbytes == 0) {
-				std::cout<<"recv mi da 0 esco"<<std::endl;
-				break ;
-			}
-			buf[nbytes] = '\0';
-			line += buf;
-			std::cout<<"size "<<line.size() <<" line da mandare a getChunk"<<std::endl;
-		}
-		char buf[256];
-			std::cout<<"pre recv2"<<std::endl;
-			short nbytes = recv(fd, buf, 255, 0);
-			std::cout<<"post recv2"<<std::endl;
-			buf[nbytes] = '\0';
-			std::cout<< "altro? nbytes:"<<nbytes<<" "<<buf<<std::endl; 
+		std::string content = getChunks(fd);
 		std::string response_body;
-		std::cout<<" content size:"<<content.str().size()<<std::endl;
-		if (content.str().size() != 0 && location.getCgiPass() != "")
+		std::string filepath = _requestMap["URI"];
+		filepath.replace(filepath.find(location._location_name), location._location_name.size(), location.getRoot());
+		size_t pos = filepath.find("//");
+		if (pos != std::string::npos)
+			filepath.erase(pos, 1);
+		std::cout<<"filepath:"<<filepath<<std::endl;
+		std::ofstream file(filepath.c_str(), std::ios::out | std::ios::trunc);
+		if (file.is_open()){
 			response_body = executeCGI(location, content);
-		std::cout<<"response body "<<response_body<<std::endl;
-		std::string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " + std::to_string(response_body.size()) + "\r\n\r\n";
-		if (response_body != "")
-			response += response_body + "\r\n";
-		std::cout<<"response "<<response<<std::endl;
-		if (send(fd, response.c_str(), response.size(), MSG_NOSIGNAL) == -1)
-			std::cout << "Send error!\n";
+			if (response_body.find("Status") != std::string::npos)
+				response_body.erase(0, response_body.find("\r\n\r\n") + 4);
+			std::cout<<"final respone body size:"<<response_body.size()<<std::endl;
+			file << response_body;
+			file.close();
+			std::string response = "HTTP/1.1 201 Created\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + std::to_string(response_body.size()) + "\r\n\r\n";
+			if (response_body != "")
+				response += response_body;
+			std::cout<<"response body size"<<response_body.size() <<std::endl;
+			if (send(fd, response.c_str(), response.size(), MSG_NOSIGNAL) == -1)
+				std::cout << "Send error!\n";
+			return ;
+		}
+		file.close();
+		// manca pezzo per $uri/
+		default_error_answer(404, fd, location);
 	}
 }
 
-std::string	Server::executeCGI(Config &location, std::stringstream &content){
+std::string	Server::executeCGI(Config &location, std::string &content){
 	pid_t	pid;
 	int		std_cpy[2] = { dup(0), dup(1) };
 	char	**env = getEnvCgi(location);
@@ -71,7 +49,7 @@ std::string	Server::executeCGI(Config &location, std::stringstream &content){
 	int		fd_in = fileno(in);
 	int		fd_out = fileno(out);
 
-	write(fd_in, content.rdbuf(), content.str().size());
+	write(fd_in, content.c_str(), content.size());
 	lseek(fd_in, 0, SEEK_SET);
 
 	pid = fork();
@@ -86,15 +64,15 @@ std::string	Server::executeCGI(Config &location, std::stringstream &content){
 		size_t pos = uri.find("//");
 		if (pos != std::string::npos)
 			uri.erase(pos, 1);
+		std::cout<<"uri:"<<uri<<std::endl;
 		const char *filepath = uri.c_str();
 		char *const args[3] = {strdup(location.getCgiPass().c_str()), strdup(filepath), NULL};
 		dup2(fd_in, 0);
 		dup2(fd_out, 1);
-/*		std::cout<<"cgipass "<<location.getCgiPass()<<std::endl;
 		std::cout<<"args0"<<args[0]<<std::endl;
 		std::cout<<"args1"<<args[1]<<std::endl;
-		std::cout<<"args2"<<args[2]<<std::endl;*/
-		execve(location.getCgiPass().c_str(), args, env);
+		std::cout<<"args2"<<args[2]<<std::endl;
+		execve(args[0], args, env);
 		std::cout << "exxxecve failed" << std::endl;
 		write(1, "Status: 500\r\n\r\n", 15);
 		exit (0);
@@ -111,8 +89,6 @@ std::string	Server::executeCGI(Config &location, std::stringstream &content){
 				_retBody.push_back(buffer[i]);
 			memset(buffer, 0, sizeof buffer);
 		}
-			std::ofstream file("prova.txt", std::ios::out | std::ios::trunc) ;
-			file << _retBody.c_str();
 	}
 	fclose(in);
 	fclose(out);
@@ -150,8 +126,9 @@ char	**Server::getEnvCgi(Config &location) {
 	envMap.insert(std::make_pair("SERVER_PROTOCOL", "HTTP/1.1"));
 	envMap.insert(std::make_pair("SERVER_SOFTWARE", "Webserv/1.0"));
 	envMap.insert(std::make_pair("REDIRECT_STATUS", "200"));
-	//if (conn.headers.find("X-Secret") != conn.headers.npos)
-	//    envMap.insert(std::make_pair("HTTP_X_SECRET_HEADER_FOR_TEST", conn.headers.substr(conn.headers.find("X-Secret") + 26, conn.headers.find_first_of("\r\n"))));
+	if (_requestMap["X-Secret-Header-For-Test"] != ""){
+		std::cout<<"secret head:"<< _requestMap["X-Secret-Header-For-Test"]<< std::endl;
+		envMap.insert(std::make_pair("HTTP_X_SECRET_HEADER_FOR_TEST", _requestMap["X-Secret-Header-For-Test"]));}
 	char	**env = new char*[envMap.size() + 1];
 	int	j = 0;
 	for (sSMap::const_iterator i = envMap.begin(); i != envMap.end(); i++) {

@@ -46,10 +46,10 @@ class Server {
 		void	handleDELETE(int fd);
 		void	handlePUT(int fd, Config &location);
 		void	handlePUTChunked(int fd,Config &location);
-		bool	getChunk(std::string &line, int fd);
+		std::string getChunks(int fd);
 		//short	getRequestContent(int fd, std::string line, std::stringstream &content, int maxBodySize);
 		void	handlePOST(int fd, Config &location);
-		std::string	executeCGI(Config &location, std::stringstream &content);
+		std::string	executeCGI(Config &location, std::string &content);
 		char	**getEnvCgi(Config &location);
 		int		getBody(std::ifstream &body, Config &location);
 		bool	getIcon(std::ifstream &body);
