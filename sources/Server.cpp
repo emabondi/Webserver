@@ -95,16 +95,15 @@ void	Server::handleClient(int i) {
 	}
 	std::cout<<request<<std::endl;
 	this->parseRequest(request);
-	if (_requestMap["URI"] != "/favicon.ico")
-		std::cout << request << std::endl;
+	//if (_requestMap["URI"] != "/favicon.ico")
+	//	std::cout << request << std::endl;
 	Config location;
 	if (this->checkRequest(socketArr[i].fd, location)) {
 /*			std::cout<<"INIZIO "<<location._location_name<<std::endl;
 			location.displayConfig();
 			std::cout<<"FINE"<<std::endl;*/
 		handleRequest(socketArr[i].fd, location);
-	}
-	std::cout<< "Ho chiuso il cazzo dui sockete"<<socketArr[i].fd<<std::endl;
+	};
 	_requestMap.clear();
 	close(socketArr[i].fd);
 	_pfds.delFromPfds(i);
@@ -134,7 +133,7 @@ void	Server::default_error_answer(int err, int fd, Config &location) {
 				root.push_back('/');
 			//for (iSMap::iterator it = errpages.begin(); it != errpages.end(); it++) {
 			//	if ((*it) == error) {
-					file.open(root + errpage);
+					file.open((root + errpage).c_str());
 					if (!file.is_open()) {
 						file.close();
 						//return default_error_answer(500, fd, location);
@@ -180,8 +179,11 @@ void	Server::default_error_answer(int err, int fd, Config &location) {
 		}
 		res.resize(res.size() - 2);
 		res += "\n\r";
-	}	
-	res += "Server: webserv1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: ";
+	}
+	if (err != 204)
+		res += "Server: webserv1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: ";
+	else
+		res += "\r\n";
 	if (file.is_open()) {
 		convert << file.rdbuf();
 		file.close();
@@ -190,13 +192,13 @@ void	Server::default_error_answer(int err, int fd, Config &location) {
 		convert << body.size();
 		res.append(convert.str() + "\r\n\r\n" + body);
 	}
-	else if (err != 100) {
+	else if (err != 100 && err != 204) {
 		std::string tmpBody = "<html><head><title>" + tmpString + "</title></head><body><p>" + tmpString + "</p></body></html>";
 		//std::string res = "HTTP/1.1 " + tmpString + "\r\nAllow: POST\r\nServer: webserv1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: 133";
 		convert << tmpBody.length();
 		res.append(convert.str() + "\r\n\r\n" + tmpBody);
 	}
-	//std::cout<< res << std::endl;
+	std::cout<< res << std::endl;
 	if (send(fd, res.c_str(), res.size(), 0) == -1)
 		std::cout << "Send error!\n";
 }

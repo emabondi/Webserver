@@ -15,10 +15,8 @@ bool	Server::checkRequest(int fd, Config &location) {
 		}
 		if (location._location_name == "/") {
 			for (sCMap::iterator it = _locationMap.begin(); it != _locationMap.end(); it++) {
-				std::cout<<"try_location: "<< it->first << std::endl;
 				if (it->first.at(0) == '~' && it->first.size() >= 3 && it->first.at(1) == ' ' && it->first.find_first_not_of(' ', 1) != std::string::npos) {
 					std::string end = it->first.substr(it->first.find_first_not_of(' ', 1));
-					std::cout<<"end: "<< end<<std::endl;
 					if (this->checkExtensionCgi(end, location) && temp_request.size() >= end.size() && temp_request.substr(temp_request.size() - end.size() - 1) == end) {
 						location = _locationMap[it->first];
 						location._location_name = it->first;
@@ -75,7 +73,6 @@ void	Server::parseRequest(std::string request) {
 	}
 	size_t fine = request.rfind("\r\n\r\n");
 	if (fine != std::string::npos) {
-		std::cout<<"ultima "<< request.substr(fine+4)<<std::endl;
 		_requestMap.insert(std::make_pair("Last", request.substr(fine+4)));
 	}
 	while (prova[i] != '\0') {
@@ -102,7 +99,6 @@ void Server::handleRequest(int fd, Config &location) {
 	for (i = 0; i < 5; i++)
 		if (methods[i] == _requestMap["HTTP_method"])
 			break ;
-	std::cout << methods[i] << std::endl;
 	switch(i)
 	{
 		case GET:
@@ -136,7 +132,6 @@ void	Server::handleGET(int fd, Config &location) {
 
 	oss << "HTTP/1.1 200 OK\r\n";
 	std::cout<< "handleGET "<< _requestMap["URI"] << std::endl;
-	std::cout<< "location name:" << location._location_name << std::endl;
 	if (_requestMap["URI"] == "/favicon.ico") {
 		if(!getIcon(body))
 			return default_error_answer(404, fd, location);
@@ -147,7 +142,6 @@ void	Server::handleGET(int fd, Config &location) {
 			return default_error_answer(status, fd, location);
     	oss << "Content-Type: text/html\r\n";
 	}
-	std::cout<< "non va in errore\n";
 	std::string b( (std::istreambuf_iterator<char>(body) ),
                        (std::istreambuf_iterator<char>()    ) );
     oss << "Content-Length: " << b.size() << "\r\n";
@@ -156,10 +150,8 @@ void	Server::handleGET(int fd, Config &location) {
     oss << b;
 	//oss << "\r\n\n\r"; //forse non va messo, sembra che il tester dia un errore
 	std::string response(oss.str());
-	//std::cout << response << std::endl;
 	if (send(fd, response.c_str(), response.size(), MSG_NOSIGNAL) == -1)
 		std::cout << "Send error!\n";
-	std::cout<<"esco da handle get"<< std::endl;
 }
 
 void	Server::handlePUT(int fd, Config &location) {
@@ -170,7 +162,9 @@ void	Server::handlePUT(int fd, Config &location) {
 }
 
 void Server::handlePUTChunked(int fd, Config &location) {
-	std::string body = getChunks(fd);
+	std::string body = getChunks(fd, location.getClientMaxBodySize());
+	if (body == "413")
+		return default_error_answer(413, fd, location);
 		//std::cout << "size "<<chunkSize<<std::endl<< "body:"<<body<<std::endl<<" body size "<<body.size()<<std::endl;
 	std::string filepath(location.getRoot());
 	std::string line = _requestMap["URI"];
@@ -206,14 +200,14 @@ void Server::handlePUTChunked(int fd, Config &location) {
 	default_error_answer(404, fd, location);
 }
 
-std::string Server::getChunks(int fd){
+std::string Server::getChunks(int fd, size_t max_body_size){
 	char c;
 	size_t size;
 	std::string buf;
 	std::string body;
 
 	std::cout<<"wait..."<<std::endl;
-	int max_body_size = _config.getClientMaxBodySize();
+	std::cout<< "max body:"<<max_body_size<<std::endl;
 	while(body.size() < max_body_size || max_body_size == 0)
 	{
 		while (buf.find("\r\n") == std::string::npos)
@@ -227,7 +221,7 @@ std::string Server::getChunks(int fd){
 		size = 0;
 		conv >> std::hex >> size;
 		if(size == 0)
-			goto pene;
+			break ;
 		buf.clear();
 		while (buf.size() < size + 2)
 		{
@@ -244,11 +238,11 @@ std::string Server::getChunks(int fd){
 		buf.erase(buf.size() - 2);
 		//std::cout<<"buf2 size:"<<buf.size()<<std::endl;
 		body += buf;
-		std::cout<<"size body:"<<body.size()<<std::endl;
+		//std::cout<<"size body:"<<body.size()<<std::endl;
 		buf.clear();
+		if (max_body_size != 0 && body.size() > max_body_size)
+			return ("413");
 	}
-	pene:
-		;
 	std::cout<<"vado dopo pene "<<body.size()<<std::endl;
 	return body;
 }
@@ -273,7 +267,7 @@ int Server::getBody(std::ifstream &body, Config &location) {
 			resource_path.erase(pos, 1);
 		std::cout<<"resource_path at size -1:"<<resource_path.at(resource_path.size() - 1) <<std::endl;
 	}
-	std::cout<<"check try files $uri "<< this->checkTryFiles("$uri", location)<<std::endl;
+	//std::cout<<"check try files $uri "<< this->checkTryFiles("$uri", location)<<std::endl;
 	if (!isDirectory(resource_path) && this->checkTryFiles("$uri", location)) {
 		body.open(resource_path.c_str());
 		if (body.is_open() == true){std::cout<<"no dir open file"<<std::endl;
@@ -285,11 +279,9 @@ int Server::getBody(std::ifstream &body, Config &location) {
 	if (this->checkTryFiles("$uri/", location)) {
 		if (resource_path.at(resource_path.size() - 1) != '/')
 			resource_path.push_back('/');
-		std::cout<<"resource path:"<<resource_path<<std::endl;
 		sVec	indexes = location.getIndex();
 		for (sVec::iterator it = indexes.begin(); it != indexes.end(); it++)
 		{
-			std::cout<< "tentativo: " << resource_path + *it << std::endl;
 			body.open((resource_path + *it).c_str());
 			if (body.is_open() == true) {
 				_requestMap.insert(std::make_pair("URI_TRANSLATED", resource_path + *it));
@@ -297,7 +289,6 @@ int Server::getBody(std::ifstream &body, Config &location) {
 			body.close();
 		}
 	}
-	std::cout<<"final return"<< std::endl;
 	return 404;
 }
 
@@ -316,15 +307,18 @@ bool isDirectory(const std::string& path) {
 	return false;
 }
 
+std::string toString(int num) {
+	std::stringstream ss;
+	ss << num;
+	return ss.str();
+}
+
 bool	Server::checkTryFiles(std::string check, Config &location) {
 	sVec try_files = location.getTryFiles();
-	std::cout<<"check:"<<check<<"size"<<try_files.size()<<std::endl;
 	for (std::vector<std::string>::iterator it = try_files.begin(); it != try_files.end(); it++) {
-		std::cout<<"it:"<<(*it)<<std::endl;
 		if ((*it) == check)
 			return true;
 	}
-	std::cout<<"esco:"<<check<<std::endl;
 	return false;
 }
 

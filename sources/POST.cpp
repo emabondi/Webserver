@@ -2,32 +2,50 @@
 
 void	Server::handlePOST(int fd, Config &location) {
 	if (_requestMap["Transfer-Encoding"] == "chunked") {
-		std::string content = getChunks(fd);
+		std::string content = getChunks(fd, location.getClientMaxBodySize());
+		if (content == "413")
+			return default_error_answer(413, fd, location);
+		if (content.size() == 0)
+			return default_error_answer(204, fd, location);
 		std::string response_body;
 		std::string filepath = _requestMap["URI"];
 		filepath.replace(filepath.find(location._location_name), location._location_name.size(), location.getRoot());
 		size_t pos = filepath.find("//");
 		if (pos != std::string::npos)
 			filepath.erase(pos, 1);
-		std::cout<<"filepath:"<<filepath<<std::endl;
 		std::ofstream file(filepath.c_str(), std::ios::out | std::ios::trunc);
 		if (file.is_open()){
 			response_body = executeCGI(location, content);
 			if (response_body.find("Status") != std::string::npos)
 				response_body.erase(0, response_body.find("\r\n\r\n") + 4);
-			std::cout<<"final respone body size:"<<response_body.size()<<std::endl;
+			std::cout<<"final response body size:"<<response_body.size()<<std::endl;
 			file << response_body;
 			file.close();
-			std::string response = "HTTP/1.1 201 Created\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + std::to_string(response_body.size()) + "\r\n\r\n";
+			std::string response = "HTTP/1.1 201 Created\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + toString(response_body.size()) + "\r\n\r\n";
 			if (response_body != "")
 				response += response_body;
-			std::cout<<"response body size"<<response_body.size() <<std::endl;
 			if (send(fd, response.c_str(), response.size(), MSG_NOSIGNAL) == -1)
 				std::cout << "Send error!\n";
 			return ;
 		}
 		file.close();
-		// manca pezzo per $uri/
+		if (checkTryFiles("$uri/", location)){
+			if (filepath.at(filepath.size() - 1) != '/')
+				filepath.push_back('/');
+			sVec indexes = location.getIndex();
+			for (sVec::iterator it = indexes.begin(); it != indexes.end(); it++)
+			{
+				std::ofstream file(filepath.c_str(), std::ios::out | std::ios::trunc) ;
+				//std::cout<< "tentativo: " << filepath + *it << " it:"<<*it<< std::endl;
+				file.open((filepath + *it).c_str());
+				if (file.is_open() == true){
+					file << response_body;
+					file.close();
+					return default_error_answer(201, fd, location);
+				}
+				file.close();
+			}
+		}
 		default_error_answer(404, fd, location);
 	}
 }
@@ -64,14 +82,10 @@ std::string	Server::executeCGI(Config &location, std::string &content){
 		size_t pos = uri.find("//");
 		if (pos != std::string::npos)
 			uri.erase(pos, 1);
-		std::cout<<"uri:"<<uri<<std::endl;
 		const char *filepath = uri.c_str();
 		char *const args[3] = {strdup(location.getCgiPass().c_str()), strdup(filepath), NULL};
 		dup2(fd_in, 0);
 		dup2(fd_out, 1);
-		std::cout<<"args0"<<args[0]<<std::endl;
-		std::cout<<"args1"<<args[1]<<std::endl;
-		std::cout<<"args2"<<args[2]<<std::endl;
 		execve(args[0], args, env);
 		std::cout << "exxxecve failed" << std::endl;
 		write(1, "Status: 500\r\n\r\n", 15);
@@ -122,7 +136,7 @@ char	**Server::getEnvCgi(Config &location) {
 	envMap.insert(std::make_pair("REQUEST_URI", _requestMap["URI"]));
 	envMap.insert(std::make_pair("SCRIPT_NAME", location.getCgiPass().substr(location.getCgiPass().find_last_of("/") + 1)));
 	envMap.insert(std::make_pair("SERVER_NAME", "http://" + _requestMap["Host"]));
-	envMap.insert(std::make_pair("SERVER_PORT", std::to_string(_config.getListen())));
+	envMap.insert(std::make_pair("SERVER_PORT", toString(_config.getListen())));
 	envMap.insert(std::make_pair("SERVER_PROTOCOL", "HTTP/1.1"));
 	envMap.insert(std::make_pair("SERVER_SOFTWARE", "Webserv/1.0"));
 	envMap.insert(std::make_pair("REDIRECT_STATUS", "200"));

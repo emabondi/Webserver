@@ -46,7 +46,7 @@ class Server {
 		void	handleDELETE(int fd);
 		void	handlePUT(int fd, Config &location);
 		void	handlePUTChunked(int fd,Config &location);
-		std::string getChunks(int fd);
+		std::string getChunks(int fd, size_t max_body_size);
 		//short	getRequestContent(int fd, std::string line, std::stringstream &content, int maxBodySize);
 		void	handlePOST(int fd, Config &location);
 		std::string	executeCGI(Config &location, std::string &content);
@@ -67,5 +67,5 @@ class Server {
 };
 		
 	bool	isDirectory(const std::string& path);
-
+	std::string toString(int num);
 #endif

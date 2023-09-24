@@ -19,7 +19,6 @@ void	Pfds::addToPfds(int new_fd){
 	_socketArr[_count].fd = new_fd;
 	_socketArr[_count].events = POLLIN;
 	_count++;
-	//std::cout << "nuovo socket allocato, grandezza:" << *fd_size << " count: " << *fd_count << std::endl;
 }
 
 void	Pfds::delFromPfds(int i){

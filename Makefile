@@ -6,7 +6,7 @@ SRC_FIL = $(addprefix sources/,main.cpp Cluster.cpp Server.cpp Config.cpp \
 #OBJS = $(SRC_FIL:.cpp=.o)
 OBJS = *.o
 $(NAME): $(SRC_FIL)
-		c++ -c $(SRC_FIL)
+		c++ $(FLAGS) -c $(SRC_FIL)
 		c++ $(OBJS) -o $(NAME)
 
 all: $(NAME)
@@ -22,12 +22,11 @@ fclean:	clean
 		rm -rf $(NAME)
 		rm -rf Debug/$(NAME)
 		rm -rf fake_site/file_should_exist_after
-		rm fake_site/YoupiBanane/youpla.bla
 
 re:		fclean all
 
 vai: all
-	rm fake_site/YoupiBanane/youpi.bla fake_site/YoupiBanane/youpla.bla
+	rm fake_site/YoupiBanane/youpi.bla
 	cp fake_site/YoupiBanane/youpi.blaa fake_site/YoupiBanane/youpi.bla
 	@./$(NAME)
 

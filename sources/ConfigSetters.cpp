@@ -95,7 +95,8 @@ void	Config::setErrorPage(std::string &configStr) {
 	configStr = configStr.substr(pos, end - pos);
 	end = configStr.find_first_of(" \t");
 	try {
-		error_code = std::stoi(configStr.substr(0, end));
+		std::stringstream ss(configStr.substr(0, end));
+		ss >> error_code;
 	}
 	catch(std::exception &e) {
 		throw badConfigFile();
