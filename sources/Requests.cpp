@@ -131,7 +131,7 @@ void	Server::handleGET(int fd, Config &location) {
 	std::ostringstream oss;
 
 	oss << "HTTP/1.1 200 OK\r\n";
-	std::cout<< "handleGET "<< _requestMap["URI"] << std::endl;
+	//std::cout<< "handleGET "<< _requestMap["URI"] << std::endl;
 	if (_requestMap["URI"] == "/favicon.ico") {
 		if(!getIcon(body))
 			return default_error_answer(404, fd, location);
@@ -144,6 +144,7 @@ void	Server::handleGET(int fd, Config &location) {
 	}
 	std::string b( (std::istreambuf_iterator<char>(body) ),
                        (std::istreambuf_iterator<char>()    ) );
+	body.close();
     oss << "Content-Length: " << b.size() << "\r\n";
     // oss << "Connection: keep-alive\r\n";
     oss << "\r\n";
@@ -238,7 +239,7 @@ std::string Server::getChunks(int fd, size_t max_body_size){
 		buf.erase(buf.size() - 2);
 		//std::cout<<"buf2 size:"<<buf.size()<<std::endl;
 		body += buf;
-		//std::cout<<"size body:"<<body.size()<<std::endl;
+		//std::cout<<"status: "<<body.size() % (max_body_size / 100) <<"%" <<std::endl;
 		buf.clear();
 		if (max_body_size != 0 && body.size() > max_body_size)
 			return ("413");
@@ -257,20 +258,16 @@ int Server::getBody(std::ifstream &body, Config &location) {
 		resource_path = root;
 	}
 	else {
-		std::cout<<"resource_path prima:"<<resource_path<<std::endl;
 		size_t pos = resource_path.find(location._location_name);
 
 		resource_path.replace(pos, location._location_name.size(), root);
 		pos = resource_path.find("//");
-		std::cout << "find pos:"<< pos<<" resource.size:"<< resource_path.size()<<std::endl;
 		if (pos != std::string::npos)
 			resource_path.erase(pos, 1);
-		std::cout<<"resource_path at size -1:"<<resource_path.at(resource_path.size() - 1) <<std::endl;
 	}
-	//std::cout<<"check try files $uri "<< this->checkTryFiles("$uri", location)<<std::endl;
 	if (!isDirectory(resource_path) && this->checkTryFiles("$uri", location)) {
 		body.open(resource_path.c_str());
-		if (body.is_open() == true){std::cout<<"no dir open file"<<std::endl;
+		if (body.is_open() == true){//std::cout<<"no dir open file"<<std::endl;
 		_requestMap.insert(std::make_pair("URI_TRANSLATED", resource_path));
 				return 0;}
 		else

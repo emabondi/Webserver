@@ -37,13 +37,13 @@ void	Server::startListening(void) {
 		throw std::runtime_error("Poll error");
 	if (poll_count == 0)
 		return ;
-	std::cout << socketArr[0].fd << " poll count " << poll_count << "\n";
+	//std::cout << socketArr[0].fd << " poll count " << poll_count << "\n";
 	for(size_t i = 0; i < _pfds.getCount(); i++)
 	{
 		if (socketArr[i].revents & POLLIN)
 		{
 			if (i == 0){
-				std::cout << "(handle server) nuovo socket!\n";
+				//std::cout << "(handle server) nuovo socket!\n";
 				this->handleServer();
 				}
 			else
@@ -93,7 +93,7 @@ void	Server::handleClient(int i) {
 		if (request.find("\r\n\r\n") != std::string::npos)
 			break ;
 	}
-	std::cout<<request<<std::endl;
+	//std::cout<<request<<std::endl;
 	this->parseRequest(request);
 	//if (_requestMap["URI"] != "/favicon.ico")
 	//	std::cout << request << std::endl;
@@ -123,7 +123,7 @@ void	Server::default_error_answer(int err, int fd, Config &location) {
 	std::ifstream file;
 	if (err > 400) {
 		std::string errpage = _config.getErrorPage(err);
-		std::cout<<"getted err page "<< errpage << std::endl;
+		//std::cout<<"getted err page "<< errpage << std::endl;
 		if (errpage.size() && err != 500) {
 			//std::stringstream temp;
 			//temp << err;
@@ -198,7 +198,7 @@ void	Server::default_error_answer(int err, int fd, Config &location) {
 		convert << tmpBody.length();
 		res.append(convert.str() + "\r\n\r\n" + tmpBody);
 	}
-	std::cout<< res << std::endl;
+	//std::cout<< res << std::endl;
 	if (send(fd, res.c_str(), res.size(), 0) == -1)
 		std::cout << "Send error!\n";
 }
